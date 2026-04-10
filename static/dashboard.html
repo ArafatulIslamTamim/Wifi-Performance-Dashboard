@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WiFi Performance Dashboard</title>
+
+  <link rel="stylesheet" href="/static/dashboard.css?v=20260403-4" />
+  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.30.0/plotly.min.js"></script>
+  <script defer src="/static/dashboard.js?v=20260403-3"></script>
+</head>
+<body data-api-base="./api/">
+  <div class="page">
+    <aside class="sidebar">
+      <div class="sidebar-logo">Dashboard <span>controls</span></div>
+      <div class="sidebar-divider"></div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">Metric</div>
+        <div class="ctrl-pills" id="metric-pills"></div>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">Frequency band</div>
+        <div class="ctrl-pills" id="band-pills"></div>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">Floor</div>
+        <div class="ctrl-pills" id="floor-pills"></div>
+      </div>
+      
+      <div class="ctrl-group">
+        <div class="ctrl-label">Topology</div>
+        <div class="ctrl-pills" id="topology-pills"></div>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-row">
+          <div class="ctrl-label">Select router(s)</div>
+          <div class="ctrl-actions">
+            <button class="mini-btn" id="btn-select-all" type="button">All</button>
+            <button class="mini-btn" id="btn-clear" type="button">Clear</button>
+          </div>
+        </div>
+
+        <div class="dropdown-select" id="router-dropdown">
+          <button class="dropdown-trigger" id="router-dropdown-trigger" type="button">
+            <span id="router-dropdown-label">Select router(s)</span>
+            <span class="dropdown-arrow">▾</span>
+          </button>
+
+          <div class="dropdown-menu" id="router-dropdown-menu">
+            <div class="dropdown-options" id="router-options"></div>
+          </div>
+        </div>
+
+        <div class="sidebar-caption">Select one, two, or multiple routers from the dropdown.</div>
+      </div>
+
+      <div class="ctrl-group">
+        <div class="ctrl-label">Coverage threshold</div>
+        <div class="threshold-row">
+          <input type="range" id="threshold-slider" min="0" max="1500" value="500" step="25" />
+          <span class="threshold-val" id="threshold-label">500</span>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-caption" id="sidebar-caption">Loading data…</div>
+    </aside>
+
+    <main class="main">
+      <div id="error-banner" class="error-banner"></div>
+
+      <section class="hero">
+        <h1>WiFi Performance Dashboard</h1>
+        <p>Single dashboard page for comparing with-mesh and without-mesh performance using pre-stored CSV data.</p>
+        <div class="badges">
+          <span class="badge badge-purple" id="b-metric">Throughput</span>
+          <span class="badge badge-blue" id="b-floor">—</span>
+          <span class="badge badge-green" id="b-band">—</span>
+          <span class="badge badge-amber" id="b-threshold">—</span>
+          <span class="badge badge-purple" id="b-routers">—</span>
+        </div>
+      </section>
+
+      <!-- <section class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-label">Best avg with mesh</div>
+          <div class="kpi-value" id="kpi-best-mesh">—</div>
+          <div class="kpi-delta neutral" id="kpi-best-mesh-router">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Selected avg with mesh</div>
+          <div class="kpi-value" id="kpi-avg-mesh">—</div>
+          <div class="kpi-delta neutral" id="kpi-avg-nomesh">Without mesh: —</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Best mesh improvement</div>
+          <div class="kpi-value" id="kpi-best-gain">—</div>
+          <div class="kpi-delta neutral" id="kpi-best-gain-router">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Best coverage</div>
+          <div class="kpi-value" id="kpi-best-coverage">—</div>
+          <div class="kpi-delta neutral" id="kpi-best-coverage-router">—</div>
+        </div> 
+        <div class="kpi">
+          <div class="kpi-label">Routers selected</div>
+          <div class="kpi-value" id="kpi-router-count">—</div>
+          <div class="kpi-delta neutral" id="kpi-total-router-count">Total loaded: —</div>
+        </div>
+      </section> -->
+
+      <section class="kpi-donut-container" id="kpi-donut-container">
+      </section>
+
+      <section class="section-header">
+        <div class="section-title">Router comparison vs distance</div>
+        <div class="section-sub">Solid = with mesh · dotted = without mesh · threshold line shown when enabled</div>
+      </section>
+      <section class="chart-grid-2">
+        <article class="chart-card">
+          <div class="chart-title">DISTANCE PROFILE</div>
+          <div id="chart-line" class="chart-box"></div>
+        </article>
+        <article class="chart-card">
+          <div class="chart-title">AVERAGE COMPARISON</div>
+          <div id="chart-bar" class="chart-box"></div>
+        </article>
+      </section>
+
+      <section class="section-header">
+        <div class="section-title">Multi-router comparison</div>
+        <div class="section-sub">Radar, coverage comparison, and total drop-off comparison for the selected routers</div>
+      </section>
+
+      <!-- <div class="section-header">
+        <div class="section-title">Router spotlight</div>
+        <div class="section-sub">Uses the first selected router for detailed area and donut coverage views</div>
+      </div> -->
+      <!-- <div class="chart-grid-2">
+        <div class="chart-card">
+          <div class="chart-title">COVERAGE AREA — MESH VS NO MESH</div>
+          <div id="chart-area" style="height:340px"><div class="loading"><div class="spinner"></div></div></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">COVERAGE DONUT</div>
+          <div id="chart-donut" style="height:340px"><div class="loading"><div class="spinner"></div></div></div>
+        </div>
+      </div> -->
+
+      <section class="chart-grid-3">
+        <article class="chart-card">
+          <div class="chart-title">PERFORMANCE RADAR</div>
+          <div id="chart-radar" class="chart-box chart-box-sm"></div>
+        </article>
+        <article class="chart-card">
+          <div class="chart-title">COVERAGE BANDS ≥ THRESHOLD</div>
+          <div id="chart-coverage" class="chart-box chart-box-sm"></div>
+        </article>
+        <article class="chart-card">
+          <div class="chart-title">TOTAL DROP-OFF</div>
+          <div id="chart-dropoff" class="chart-box chart-box-sm"></div>
+        </article>
+      </section>
+
+    <div class="section-header">
+        <div class="section-title">Coverage depth</div>
+        <div class="section-sub">Dual heatmaps for with-mesh and without-mesh plus cumulative distribution</div>
+      </div>
+      <div class="chart-grid-equal">
+        <div class="chart-card">
+          <div class="chart-title">HEATMAP — WITH MESH</div>
+          <div id="chart-heatmap-mesh" class="chart-box chart-box-md"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">HEATMAP — WITHOUT MESH</div>
+          <div id="chart-heatmap-nomesh" class="chart-box chart-box-md"></div>
+        </div>
+      </div> <div class="section-header">
+        <div class="section-title">Router rankings</div>
+        <div class="section-sub">Ranked by average performance in each mode</div>
+      </div>
+      <div class="chart-grid-equal">
+        <div class="chart-card">
+          <div class="chart-title">RANKING — WITH MESH</div>
+          <div id="chart-rank-mesh" class="chart-box chart-box-md"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">RANKING — WITHOUT MESH</div>
+          <div id="chart-rank-nomesh" class="chart-box chart-box-md"></div>
+        </div>
+             <section class="section-header">
+       <div class="section-title">Summary table</div>
+     </section>
+     <article class="chart-card full">
+       <div class="table-wrap">
+         <table class="summary-table">
+           <thead>
+             <tr>
+               <th>Router</th>
+               <th>Avg mesh</th>
+               <th>Avg no mesh</th>
+               <th>Mesh Improvement</th>
+               <th>Peak mesh</th>
+               <th>Coverage</th>
+               <th>Drop total</th>
+             </tr>
+           </thead>
+           <tbody id="summary-tbody">
+             <tr>
+               <td colspan="7" class="table-empty">Loading…</td>
+             </tr>
+           </tbody>
+         </table>
+       </div>
+     </article>
+     </div>
+
+
+     <!-- <div class="chart-card full">
+       <div class="chart-title">CUMULATIVE DISTRIBUTION (CDF)</div>
+       <div id="chart-cdf" class="chart-box chart-box-md"></div>
+     </div> -->
+     </div>
+
+
+    </main>
+  </div>
+</body>
+</html>

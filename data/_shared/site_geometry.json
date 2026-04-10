@@ -1,0 +1,162 @@
+{
+  "version": 3,
+  "master_esx_filename": "actual floor plans.esx",
+  "master_esx_sha256": "7a4fcd66909b150b2dfa449af28e4ba936bfc578aa8b3aeb472f92e11f17e0fe",
+  "base_floor": "Ground Floor",
+  "links": {
+    "Lower Floor": {
+      "align_to": "Ground Floor",
+      "labels": [
+        "stair",
+        "ref"
+      ],
+      "child_anchors_px": {
+        "stair_px": [
+          862.6943666269103,
+          2036.0286449280402
+        ],
+        "ref_px": [
+          1229.7983524255956,
+          2039.6996454147259
+        ]
+      },
+      "parent_anchors_px": {
+        "stair_px": [
+          2200.64781505263,
+          1999.6750158528855
+        ],
+        "ref_px": [
+          2198.3649853689653,
+          2394.60209258085
+        ]
+      }
+    },
+    "Upper Floor": {
+      "align_to": "Ground Floor",
+      "labels": [
+        "stair",
+        "ref"
+      ],
+      "child_anchors_px": {
+        "stair_px": [
+          580.8044156600607,
+          1768.1296417394553
+        ],
+        "ref_px": [
+          1579.6400349480634,
+          1760.7308842075763
+        ]
+      },
+      "parent_anchors_px": {
+        "stair_px": [
+          2200.64781505263,
+          1276.7715599239064
+        ],
+        "ref_px": [
+          2196.0821556853007,
+          2397.6339568801523
+        ]
+      }
+    }
+  },
+  "dut_px_by_floor": {
+    "Ground Floor": [
+      1707.6692845443997,
+      1804.290437760191
+    ]
+  },
+  "dut_px_by_router": {
+    "KVD21": {
+      "base_floor": "Ground Floor",
+      "floorPlanId": "3c7a8350-7ff0-4c10-82bd-2e4cdca77a6f",
+      "floorPlanName": "Ground Floor ",
+      "dut_px": [
+        1707.6692845443997,
+        1804.290437760191
+      ],
+      "source": {
+        "esx_filename": "KVD21 February 2026 Survey (No APs).esx",
+        "ap_id": "65903ce6-411e-4a72-9e5f-51f42182509d",
+        "ap_name": "Measured AP-a6:0d",
+        "method": "mine_true_ap_position"
+      }
+    },
+    "Nokia5G21": {
+      "base_floor": "Ground Floor",
+      "floorPlanId": "3c7a8350-7ff0-4c10-82bd-2e4cdca77a6f",
+      "floorPlanName": "Ground Floor ",
+      "dut_px": [
+        1761.5059635940352,
+        1769.0007350741773
+      ],
+      "source": {
+        "esx_filename": "Nokia5G21 February 2026 Survey (No APs).esx",
+        "ap_id": "a23ea10c-b03e-4ebd-a7f2-637d5e09f299",
+        "ap_name": "Measured AP-7d:c4",
+        "method": "mine_true_ap_position"
+      }
+    },
+    "Sagemcom": {
+      "base_floor": "Ground Floor",
+      "floorPlanId": "3c7a8350-7ff0-4c10-82bd-2e4cdca77a6f",
+      "floorPlanName": "Ground Floor ",
+      "dut_px": [
+        1785.2508044637402,
+        1840.5224070288596
+      ],
+      "source": {
+        "esx_filename": "Sagemcom February 2026 Survey (No APs).esx",
+        "ap_id": "30778ff8-6b63-428a-a670-d72a2f450123",
+        "ap_name": "Measured AP-5c:06",
+        "method": "mine_true_ap_position"
+      }
+    },
+    "TMO-G4AR": {
+      "base_floor": "Ground Floor",
+      "floorPlanId": "3c7a8350-7ff0-4c10-82bd-2e4cdca77a6f",
+      "floorPlanName": "Ground Floor ",
+      "dut_px": [
+        1824.2489507001094,
+        1640.070732421664
+      ],
+      "source": {
+        "esx_filename": "TMO-G4AR February 2026 Survey (No APs).esx",
+        "ap_id": "d3662038-6f27-4823-953d-757d24005da1",
+        "ap_name": "Measured AP-74:aa",
+        "method": "mine_true_ap_position"
+      }
+    },
+    "TMO-G4SE": {
+      "base_floor": "Ground Floor",
+      "floorPlanId": "3c7a8350-7ff0-4c10-82bd-2e4cdca77a6f",
+      "floorPlanName": "Ground Floor ",
+      "dut_px": [
+        1763.9211838346523,
+        1762.6667334715767
+      ],
+      "source": {
+        "esx_filename": "TMO-G4SE February 2026 Survey (No APs).esx",
+        "ap_id": "b2d76be9-fcdb-422f-a935-79b7b4165380",
+        "ap_name": "Measured AP-96:e2",
+        "method": "mine_true_ap_position"
+      }
+    },
+    "TMO-G5AR": {
+      "base_floor": "Ground Floor",
+      "floorPlanId": "3c7a8350-7ff0-4c10-82bd-2e4cdca77a6f",
+      "floorPlanName": "Ground Floor ",
+      "dut_px": [
+        1785.982093131248,
+        1726.9064591343513
+      ],
+      "source": {
+        "esx_filename": "TMO-G5AR February 2026 Survey (No APs).esx",
+        "ap_id": "f1a081b7-8b9c-47f4-9308-963f327e4299",
+        "ap_name": "Measured AP-0b:1e",
+        "method": "mine_true_ap_position"
+      }
+    }
+  },
+  "floor_elevation_m": {},
+  "notes": "anchors are in floor image pixel coords; transforms built in meters; links can chain."
+}
