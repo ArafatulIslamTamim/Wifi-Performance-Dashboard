@@ -7,12 +7,28 @@ const state = {
   band: null,
   topology: "both",
   threshold: 500,
+  maxDistance: 70,
   routers: [],
   allRouters: [],
   payload: null,
   options: null,
   labelMap: {},
   routerOptions: [],
+};
+
+function normalizeRouterKey(name) {
+  return String(name || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+const ROUTER_LINKS = {
+  KVD21: "https://www.t-mobile.com/support/home-internet/arcadyan-gateway",
+  SAGEMCOM: "https://www.t-mobile.com/support/home-internet/sagemcom-gateway",
+  TMO_G4AR: "https://www.t-mobile.com/support/home-internet/5g-gateway-g4ar",
+  TMO_G4SE: "https://www.t-mobile.com/support/home-internet/5g-gateway-g4se",
+  TMO_G5AR: "https://www.t-mobile.com/support/home-internet/5g-gateway-g5",
 };
 
 const COLORS = [
@@ -34,6 +50,7 @@ const CHART_IDS = [
   "chart-cdf",
   "chart-rank-mesh",
   "chart-rank-nomesh",
+  "chart-zone-coverage",
 ];
 
 const PALETTE = [
@@ -114,6 +131,37 @@ function routerDisplayName(name) {
 
 function routerLabel(name) {
   return state.labelMap[name] || routerDisplayName(name);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function routerUrl(routerName) {
+  return ROUTER_LINKS[normalizeRouterKey(routerName)] || "";
+}
+
+function routerAnchorHtml(routerName) {
+  const label = escapeHtml(routerLabel(routerName));
+  const url = routerUrl(routerName);
+
+  if (!url) return label;
+
+  return `
+    <a
+      href="${url}"
+      target="_blank"
+      rel="noopener noreferrer"
+      style="color: inherit; text-decoration: underline; text-underline-offset: 3px;"
+    >
+      ${label}
+    </a>
+  `;
 }
 
 function topologyLabel(value) {
@@ -197,6 +245,10 @@ function mean(values) {
   return filtered.reduce((a, b) => a + b, 0) / filtered.length;
 }
 
+function round2(value) {
+  return isNum(value) ? Math.round(value * 100) / 100 : null;
+}
+
 function sortFloors(arr) {
   const order = { "Ground Floor": 0, "Lower Floor": 1, "Upper Floor": 2 };
   return [...arr].sort((a, b) => (order[a] ?? 99) - (order[b] ?? 99));
@@ -205,6 +257,30 @@ function sortFloors(arr) {
 function sortBands(arr) {
   const order = { "2.4 GHz": 0, "5 GHz": 1 };
   return [...arr].sort((a, b) => (order[a] ?? 99) - (order[b] ?? 99));
+}
+
+function currentMode() {
+  return state.topology || "both";
+}
+
+function wantsMesh() {
+  return currentMode() === "both" || currentMode() === "with_mesh";
+}
+
+function wantsNoMesh() {
+  return currentMode() === "both" || currentMode() === "without_mesh";
+}
+
+function selectedRoutersFromPayload() {
+  if (!state.payload) return [];
+  const available = state.payload.routers || [];
+  const selected = state.routers.filter((router) => available.includes(router));
+  if (selected.length) return selected;
+  return available.slice(0, Math.min(5, available.length));
+}
+
+function primaryRouter(selected) {
+  return selected && selected.length ? selected[0] : null;
 }
 
 function setMetricThresholdDefaults() {
@@ -235,10 +311,7 @@ function setMetricThresholdDefaults() {
 function formatPillLabel(value, stateKey) {
   if (stateKey === "metric") {
     const val = String(value).toLowerCase();
-    // This catches "signal", "signal_strength", or "RSSI" regardless of casing
-    if (val.includes("signal") || val === "rssi") {
-      return "RSSI";
-    }
+    if (val.includes("signal") || val === "rssi") return "RSSI";
     if (val === "throughput") return "Throughput";
   }
   if (stateKey === "topology") return topologyLabel(value);
@@ -263,6 +336,140 @@ function formatMetricValue(value, unit, includeQuality = false) {
   }
 
   return base;
+}
+
+function getActiveDistanceIndices(payload) {
+  const distances = payload?.meta?.distances || [];
+  return distances
+    .map((distance, index) => (distance <= state.maxDistance ? index : -1))
+    .filter((index) => index >= 0);
+}
+
+function getActiveDistances(payload) {
+  const distances = payload?.meta?.distances || [];
+  return distances.filter((distance) => distance <= state.maxDistance);
+}
+
+function filterSeriesToDistance(payload, series) {
+  const indices = getActiveDistanceIndices(payload);
+  return indices.map((index) => {
+    const value = series?.[index];
+    return isNum(value) ? value : Number.NaN;
+  });
+}
+
+function safeMean(series) {
+  const vals = series.filter(isNum);
+  if (!vals.length) return null;
+  return vals.reduce((sum, value) => sum + value, 0) / vals.length;
+}
+
+function safeMax(series) {
+  const vals = series.filter(isNum);
+  if (!vals.length) return null;
+  return Math.max(...vals);
+}
+
+function coverageCount(series, threshold) {
+  const vals = series.filter(isNum);
+  if (!vals.length) return 0;
+  return vals.filter((value) => value >= threshold).length;
+}
+
+function seriesDrops(series) {
+  const drops = [];
+  for (let i = 1; i < series.length; i += 1) {
+    const prev = series[i - 1];
+    const curr = series[i];
+    if (!isNum(prev) || !isNum(curr)) {
+      drops.push(0);
+    } else {
+      drops.push(Math.max(prev - curr, 0));
+    }
+  }
+  return drops;
+}
+
+function dropTotal(series) {
+  return round2(seriesDrops(series).reduce((sum, value) => sum + value, 0));
+}
+
+function consistencyValue(series) {
+  const vals = series.filter(isNum);
+  if (!vals.length) return null;
+  const avg = safeMean(vals);
+  const variance = vals.reduce((sum, value) => sum + (value - avg) ** 2, 0) / vals.length;
+  return Math.sqrt(variance);
+}
+
+function gainSeries(mesh, nomesh) {
+  return mesh.map((meshValue, index) => {
+    const noMeshValue = nomesh[index];
+    if (!isNum(meshValue) || !isNum(noMeshValue)) return Number.NaN;
+    return round2(meshValue - noMeshValue);
+  });
+}
+
+function getZoneDefinitions() {
+  return [
+    {
+      key: "near",
+      label: "0–20 ft",
+      pillClass: "zone-pill-near",
+      test: (distance) => distance <= 20,
+    },
+    {
+      key: "mid",
+      label: "20–40 ft",
+      pillClass: "zone-pill-mid",
+      test: (distance) => distance > 20 && distance <= 40,
+    },
+    {
+      key: "far",
+      label: "40–70 ft",
+      pillClass: "zone-pill-far",
+      test: (distance) => distance > 40 && distance <= 70,
+    },
+  ];
+}
+
+function getZoneIndices(payload, zoneKey) {
+  const zones = getZoneDefinitions();
+  const zone = zones.find((item) => item.key === zoneKey);
+  const distances = getActiveDistances(payload);
+
+  if (!zone) return [];
+
+  return distances
+    .map((distance, index) => (zone.test(distance) ? index : -1))
+    .filter((index) => index >= 0);
+}
+
+function getZoneSeries(payload, router, zoneKey) {
+  const indices = getZoneIndices(payload, zoneKey);
+  const { mesh, nomesh } = getComparisonSeries(payload, router);
+
+  return {
+    mesh: indices.map((index) => mesh[index]),
+    nomesh: indices.map((index) => nomesh[index]),
+  };
+}
+
+function getZoneMetrics(payload, router, zoneKey) {
+  const { mesh, nomesh } = getZoneSeries(payload, router, zoneKey);
+
+  const avgMesh = safeMean(mesh);
+  const avgNomesh = safeMean(nomesh);
+  const gainAbs =
+    isNum(avgMesh) && isNum(avgNomesh)
+      ? round2(avgMesh - avgNomesh)
+      : null;
+
+  return {
+    avg_mesh: round2(avgMesh),
+    avg_nomesh: round2(avgNomesh),
+    gain_abs: gainAbs,
+  };
 }
 
 function buildPills(containerId, values, stateKey) {
@@ -323,7 +530,7 @@ function buildRouterSelect(routers) {
   optionsWrap.innerHTML = "";
 
   routers.forEach((router) => {
-    const row = document.createElement("label");
+    const row = document.createElement("div");
     row.className = "dropdown-option";
 
     const checkbox = document.createElement("input");
@@ -347,11 +554,25 @@ function buildRouterSelect(routers) {
       renderAll();
     });
 
-    const text = document.createElement("span");
-    text.textContent = routerLabel(router);
+    const link = document.createElement("a");
+    link.href = routerUrl(router);
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = routerLabel(router);
+    link.style.color = "inherit";
+    link.style.textDecoration = "underline";
+    link.style.textUnderlineOffset = "3px";
+
+    if (!routerUrl(router)) {
+      link.removeAttribute("href");
+      link.removeAttribute("target");
+      link.removeAttribute("rel");
+      link.style.textDecoration = "none";
+      link.style.cursor = "default";
+    }
 
     row.appendChild(checkbox);
-    row.appendChild(text);
+    row.appendChild(link);
     optionsWrap.appendChild(row);
   });
 
@@ -360,6 +581,7 @@ function buildRouterSelect(routers) {
 
 function bindStaticControls() {
   const slider = getEl("threshold-slider");
+  const distanceSlider = getEl("distance-slider");
   const btnSelectAll = getEl("btn-select-all");
   const btnClear = getEl("btn-clear");
   const dropdownTrigger = getEl("router-dropdown-trigger");
@@ -391,6 +613,18 @@ function bindStaticControls() {
     });
   }
 
+  if (distanceSlider) {
+    distanceSlider.addEventListener("input", (e) => {
+      state.maxDistance = Number(e.target.value);
+      const label = getEl("distance-label");
+      if (label) label.textContent = `${state.maxDistance} ft`;
+    });
+
+    distanceSlider.addEventListener("change", () => {
+      renderAll();
+    });
+  }
+
   if (btnSelectAll) {
     btnSelectAll.addEventListener("click", () => {
       state.routers = state.allRouters.slice();
@@ -408,86 +642,84 @@ function bindStaticControls() {
   }
 }
 
-function drawDualRankings(payload, selected) {
-  const rowMap = getSummaryRowMap(payload);
-  const rows = selected.map((router) => rowMap[router]).filter(Boolean);
+function getComparisonSeries(payload, router) {
+  const compare = payload.series_compare?.[router];
+  if (compare) {
+    const mesh = filterSeriesToDistance(payload, compare.with_mesh || []);
+    const nomesh = filterSeriesToDistance(payload, compare.without_mesh || []);
+    return {
+      mesh,
+      nomesh,
+      gain: gainSeries(mesh, nomesh),
+    };
+  }
 
-  const renderRank = (targetId, key, color) => {
-    // Filter out routers missing data and sort high-to-low
-    const sorted = [...rows]
-      .filter(r => isNum(r[key]))
-      .sort((a, b) => b[key] - a[key]);
-
-    if (!sorted.length) {
-      renderEmptyState(targetId, "No data available");
-      return;
-    }
-
-    const values = sorted.map(r => r[key]);
-    const labels = sorted.map(r => routerLabel(r.router));
-
-    renderPlot(
-      targetId,
-      [{
-        x: values,
-        y: labels,
-        type: "bar",
-        orientation: "h",
-        marker: { color: color },
-        text: values.map(v => `${v.toFixed(1)}`),
-        textposition: "outside",
-        textfont: { size: 12, color: "#f8fafc" },
-        cliponaxis: false,
-        hovertemplate: `<b>%{y}</b><br>Avg: %{x:.1f} ${payload.meta.unit}<extra></extra>`,
-      }],
-      {
-        ...PLOTLY_BASE,
-        xaxis: { 
-          ...PLOTLY_BASE.xaxis, 
-          title: payload.meta.unit,
-          range: [0, Math.max(...values) * 1.25] 
-        },
-        yaxis: { ...PLOTLY_BASE.yaxis, autorange: "reversed" },
-        showlegend: false,
-        margin: { l: 120, r: 60, t: 10, b: 50 },
-        height: 320,
-      }
-    );
-  };
-
-  renderRank("chart-rank-mesh", "avg_mesh", "#9b5cff");
-  renderRank("chart-rank-nomesh", "avg_nomesh", "#00d5ff");
-}
-
-function selectedRoutersFromPayload() {
-  if (!state.payload) return [];
-  const available = state.payload.routers || [];
-  const selected = state.routers.filter((router) => available.includes(router));
-  if (selected.length) return selected;
-  return available.slice(0, Math.min(5, available.length));
-}
-
-function primaryRouter(selected) {
-  return selected && selected.length ? selected[0] : null;
-}
-
-function currentMode() {
-  return state.topology || "both";
-}
-
-function wantsMesh() {
-  return currentMode() === "both" || currentMode() === "with_mesh";
-}
-
-function wantsNoMesh() {
-  return currentMode() === "both" || currentMode() === "without_mesh";
+  const primary = filterSeriesToDistance(payload, payload.series?.[router] || []);
+  return { mesh: primary, nomesh: [], gain: [] };
 }
 
 function getSummaryRowMap(payload) {
   const map = {};
-  (payload.summary || []).forEach((row) => {
-    map[row.router] = row;
+  const routers = payload.routers || [];
+  const threshold = payload.meta?.threshold ?? state.threshold;
+
+  routers.forEach((router) => {
+    const { mesh, nomesh } = getComparisonSeries(payload, router);
+
+    const avgMesh = safeMean(mesh);
+    const avgNomesh = safeMean(nomesh);
+    const peakMesh = safeMax(mesh);
+    const peakNomesh = safeMax(nomesh);
+
+    const coverageMesh = coverageCount(mesh, threshold);
+    const coverageNomesh = coverageCount(nomesh, threshold);
+
+    const dropMeshTotal = dropTotal(mesh);
+    const dropNomeshTotal = dropTotal(nomesh);
+
+    const consistencyMesh = consistencyValue(mesh);
+    const consistencyNomesh = consistencyValue(nomesh);
+
+    const gainAbs =
+      isNum(avgMesh) && isNum(avgNomesh)
+        ? round2(avgMesh - avgNomesh)
+        : null;
+
+    const gainPct =
+      isNum(avgMesh) && isNum(avgNomesh) && avgNomesh !== 0
+        ? round2(((avgMesh - avgNomesh) / avgNomesh) * 100)
+        : null;
+
+    const primaryAvg = isNum(avgMesh) ? avgMesh : avgNomesh;
+    const primaryPeak = isNum(peakMesh) ? peakMesh : peakNomesh;
+    const primaryCoverage = coverageMesh > 0 || !isNum(avgNomesh) ? coverageMesh : coverageNomesh;
+    const primaryDropTotal = isNum(dropMeshTotal) ? dropMeshTotal : dropNomeshTotal;
+    const primaryConsistency = isNum(consistencyMesh) ? consistencyMesh : consistencyNomesh;
+
+    map[router] = {
+      router,
+      label: routerLabel(router),
+      avg: round2(primaryAvg),
+      peak: round2(primaryPeak),
+      coverage: primaryCoverage,
+      drop_total: primaryDropTotal,
+      consistency: round2(primaryConsistency),
+
+      avg_mesh: round2(avgMesh),
+      avg_nomesh: round2(avgNomesh),
+      peak_mesh: round2(peakMesh),
+      peak_nomesh: round2(peakNomesh),
+      coverage_mesh: coverageMesh,
+      coverage_nomesh: coverageNomesh,
+      drop_mesh_total: dropMeshTotal,
+      drop_nomesh_total: dropNomeshTotal,
+      consistency_mesh: round2(consistencyMesh),
+      consistency_nomesh: round2(consistencyNomesh),
+      gain_abs: gainAbs,
+      gain_pct: gainPct,
+    };
   });
+
   return map;
 }
 
@@ -509,28 +741,25 @@ function renderBestRouter(payload, selected) {
   }
 
   let bestRow = null;
-  let bestValue = null;
 
   if (currentMode() === "without_mesh") {
     bestRow = [...rows]
       .filter((r) => isNum(r.avg_nomesh))
       .sort((a, b) => b.avg_nomesh - a.avg_nomesh)[0];
-    bestValue = bestRow?.avg_nomesh ?? null;
   } else {
     bestRow = [...rows]
       .filter((r) => isNum(r.avg_mesh))
       .sort((a, b) => b.avg_mesh - a.avg_mesh)[0];
-    bestValue = bestRow?.avg_mesh ?? null;
   }
 
-  if (!bestRow || !isNum(bestValue)) {
+  if (!bestRow) {
     nameEl.textContent = "—";
     reasonEl.textContent = "No router has enough data for this view.";
     metaEl.textContent = "—";
     return;
   }
 
-  nameEl.textContent = routerLabel(bestRow.router);
+  nameEl.innerHTML = routerAnchorHtml(bestRow.router);
 
   if (currentMode() === "without_mesh") {
     reasonEl.textContent = `Best standalone average on ${payload.meta.band} at ${payload.meta.floor}.`;
@@ -545,21 +774,75 @@ function renderBestRouter(payload, selected) {
   reasonEl.textContent = `Best mesh-assisted average on ${payload.meta.band} at ${payload.meta.floor}.`;
   metaEl.textContent = `Average: ${formatMetricValue(bestRow.avg_mesh, payload.meta.unit, true)}${boostText}`;
 }
+function renderZoneLeaderboards(payload, selected) {
+  const containers = {
+    near: getEl("zone-best-near"),
+    mid: getEl("zone-best-mid"),
+    far: getEl("zone-best-far"),
+  };
 
-function getComparisonSeries(payload, router) {
-  const compare = payload.series_compare?.[router];
-  if (compare) {
-    return {
-      mesh: compare.with_mesh || [],
-      nomesh: compare.without_mesh || [],
-      gain: compare.gain || [],
-    };
-  }
+  const zones = getZoneDefinitions();
+  const unit = payload.meta.unit;
 
-  const primary = payload.series?.[router] || [];
-  return { mesh: primary, nomesh: [], gain: [] };
+  zones.forEach((zone) => {
+    const container = containers[zone.key];
+    if (!container) return;
+
+    const rows = selected.map((router) => {
+      const metrics = getZoneMetrics(payload, router, zone.key);
+      return {
+        router,
+        ...metrics,
+      };
+    });
+
+    let best = null;
+
+    if (currentMode() === "without_mesh") {
+      best = rows
+        .filter((row) => isNum(row.avg_nomesh))
+        .sort((a, b) => b.avg_nomesh - a.avg_nomesh)[0];
+    } else {
+      best = rows
+        .filter((row) => isNum(row.avg_mesh))
+        .sort((a, b) => b.avg_mesh - a.avg_mesh)[0];
+    }
+
+    if (!best) {
+      container.innerHTML = `<div class="zone-empty">No data available for this zone.</div>`;
+      return;
+    }
+
+    const primaryValue =
+      currentMode() === "without_mesh"
+        ? best.avg_nomesh
+        : best.avg_mesh;
+
+    const secondaryText =
+      isNum(best.avg_nomesh) && currentMode() !== "without_mesh"
+        ? `Standalone: ${best.avg_nomesh.toFixed(1)} ${unit}`
+        : currentMode() === "without_mesh"
+        ? `Mode: Standalone`
+        : `Standalone: —`;
+
+    const gainText =
+      isNum(best.gain_abs) && currentMode() !== "without_mesh"
+        ? ` · Boost: ${best.gain_abs >= 0 ? "+" : ""}${best.gain_abs.toFixed(1)} ${unit}`
+        : "";
+
+    container.innerHTML = `
+      <span class="zone-pill ${zone.pillClass}">${zone.label}</span>
+      <div class="zone-router">${routerAnchorHtml(best.router)}</div>
+      <div class="zone-score">
+        ${isNum(primaryValue) ? `${primaryValue.toFixed(1)} ${unit}` : "—"}
+      </div>
+      <div class="zone-meta">
+        ${currentMode() === "without_mesh" ? "Best standalone average" : "Best mesh-assisted average"}<br>
+        ${secondaryText}${gainText}
+      </div>
+    `;
+  });
 }
-
 function updateHero(payload, selected) {
   const unit = payload.meta.unit;
   const bMetric = getEl("b-metric");
@@ -571,8 +854,7 @@ function updateHero(payload, selected) {
 
   if (bMetric) {
     const currentMetric = String(payload.meta.metric).toLowerCase();
-    bMetric.textContent =
-      currentMetric === "throughput" ? "Throughput" : "RSSI"; 
+    bMetric.textContent = currentMetric === "throughput" ? "Throughput" : "RSSI";
   }
   if (bFloor) bFloor.textContent = payload.meta.floor;
   if (bBand) bBand.textContent = payload.meta.band;
@@ -686,37 +968,6 @@ function updateKPIs(payload, selected) {
 
   if (elRouterCount) elRouterCount.textContent = String(selected.length);
   if (elTotalRouterCount) elTotalRouterCount.textContent = `Total loaded: ${totalRouters}`;
-
-  const labelBestMesh = document.querySelector(".kpi-row .kpi:nth-child(1) .kpi-label");
-  const labelAvg = document.querySelector(".kpi-row .kpi:nth-child(2) .kpi-label");
-  const labelGain = document.querySelector(".kpi-row .kpi:nth-child(3) .kpi-label");
-  const labelCoverage = document.querySelector(".kpi-row .kpi:nth-child(4) .kpi-label");
-
-  if (labelBestMesh) {
-    labelBestMesh.textContent =
-      currentMode() === "both"
-        ? "Selected avg with mesh"
-        : currentMode() === "with_mesh"
-        ? "Selected avg with mesh"
-        : "Selected avg without mesh";
-  }
-
-  if (labelAvg) {
-    labelAvg.textContent =
-      currentMode() === "both"
-        ? "Selected avg without mesh"
-        : currentMode() === "with_mesh"
-        ? "Selected peak with mesh"
-        : "Selected peak without mesh";
-  }
-
-  if (labelGain) {
-    labelGain.textContent = currentMode() === "both" ? "Avg mesh improvement %" : "Comparison gain %";
-  }
-
-  // if (labelCoverage) {
-  //   labelCoverage.textContent = "Avg coverage bands";
-  // }
 }
 
 function updateTable(payload, selected) {
@@ -755,7 +1006,7 @@ function updateTable(payload, selected) {
   rows.forEach((row) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${routerLabel(row.router)}</td>
+      <td>${routerAnchorHtml(row.router)}</td>
       <td>${formatMetricValue(row.avg_mesh, payload.meta.unit, true)}</td>
       <td>${formatMetricValue(row.avg_nomesh, payload.meta.unit, true)}</td>
       <td>${isNum(row.gain_abs) ? `${row.gain_abs >= 0 ? "+" : ""}${row.gain_abs.toFixed(1)} ${payload.meta.unit}` : "—"}</td>
@@ -767,9 +1018,141 @@ function updateTable(payload, selected) {
   });
 }
 
+function drawDualRankings(payload, selected) {
+  const rowMap = getSummaryRowMap(payload);
+  const rows = selected.map((router) => rowMap[router]).filter(Boolean);
+
+  const renderRank = (targetId, key, color) => {
+    const sorted = [...rows]
+      .filter((r) => isNum(r[key]))
+      .sort((a, b) => b[key] - a[key]);
+
+    if (!sorted.length) {
+      renderEmptyState(targetId, "No data available");
+      return;
+    }
+
+    const values = sorted.map((r) => r[key]);
+    const labels = sorted.map((r) => routerLabel(r.router));
+
+    renderPlot(
+      targetId,
+      [{
+        x: values,
+        y: labels,
+        type: "bar",
+        orientation: "h",
+        marker: { color },
+        text: values.map((v) => `${v.toFixed(1)}`),
+        textposition: "outside",
+        textfont: { size: 12, color: "#f8fafc" },
+        cliponaxis: false,
+        hovertemplate: `<b>%{y}</b><br>Avg: %{x:.1f} ${payload.meta.unit}<extra></extra>`,
+      }],
+      {
+        ...PLOTLY_BASE,
+        xaxis: {
+          ...PLOTLY_BASE.xaxis,
+          title: payload.meta.unit,
+          range: [0, Math.max(...values) * 1.25]
+        },
+        yaxis: { ...PLOTLY_BASE.yaxis, autorange: "reversed" },
+        showlegend: false,
+        margin: { l: 120, r: 60, t: 10, b: 50 },
+        height: 320,
+      }
+    );
+  };
+
+  renderRank("chart-rank-mesh", "avg_mesh", "#9b5cff");
+  renderRank("chart-rank-nomesh", "avg_nomesh", "#00d5ff");
+}
+
+function drawZoneCoverageChart(payload, selected) {
+  const zones = getZoneDefinitions();
+  const unit = payload.meta.unit;
+
+  const meshAverages = zones.map((zone) => {
+    const vals = selected
+      .map((router) => getZoneMetrics(payload, router, zone.key).avg_mesh)
+      .filter(isNum);
+    return vals.length ? mean(vals) : null;
+  });
+
+  const nomeshAverages = zones.map((zone) => {
+    const vals = selected
+      .map((router) => getZoneMetrics(payload, router, zone.key).avg_nomesh)
+      .filter(isNum);
+    return vals.length ? mean(vals) : null;
+  });
+
+  const hasMeshData = meshAverages.some(isNum);
+  const hasNoMeshData = nomeshAverages.some(isNum);
+
+  if ((!wantsMesh() || !hasMeshData) && (!wantsNoMesh() || !hasNoMeshData)) {
+    renderEmptyState("chart-zone-coverage", "No zone comparison data available", 340);
+    return;
+  }
+
+  const x = zones.map((zone) => zone.label);
+  const traces = [];
+
+  if (wantsMesh() && hasMeshData) {
+    traces.push({
+      x,
+      y: meshAverages,
+      type: "bar",
+      name: "Mesh",
+      marker: {
+        color: ["#2dd4bf", "#f59e0b", "#ec4899"],
+        line: { color: "rgba(255,255,255,0.14)", width: 1 },
+      },
+      hovertemplate: "%{x}<br>Mesh avg: %{y:.1f} " + unit + "<extra></extra>",
+    });
+  }
+
+  if (wantsNoMesh() && hasNoMeshData) {
+    traces.push({
+      x,
+      y: nomeshAverages,
+      type: "bar",
+      name: "Standalone",
+      marker: {
+        color: ["rgba(45,212,191,0.55)", "rgba(245,158,11,0.55)", "rgba(236,72,153,0.55)"],
+        line: { color: "rgba(255,255,255,0.12)", width: 1 },
+      },
+      hovertemplate: "%{x}<br>Standalone avg: %{y:.1f} " + unit + "<extra></extra>",
+    });
+  }
+
+  renderPlot(
+    "chart-zone-coverage",
+    traces,
+    {
+      ...PLOTLY_BASE,
+      barmode: "group",
+      xaxis: {
+        ...PLOTLY_BASE.xaxis,
+        title: "Coverage zone",
+      },
+      yaxis: {
+        ...PLOTLY_BASE.yaxis,
+        title: unit,
+      },
+      height: 340,
+      margin: { l: 60, r: 20, t: 10, b: 80 },
+      legend: {
+        ...PLOTLY_BASE.legend,
+        y: -0.18,
+      },
+    },
+    CFG
+  );
+}
+
 function drawLine(payload, selected) {
   const unit = payload.meta.unit;
-  const distances = payload.meta.distances || [];
+  const distances = getActiveDistances(payload);
 
   if (!distances.length || !selected.length) {
     renderEmptyState("chart-line", "No distance profile data available", 480);
@@ -869,7 +1252,7 @@ function drawLine(payload, selected) {
     .flatMap((t) => (Array.isArray(t.y) ? t.y : []))
     .filter(isNum);
 
-  const gainSeries = traces
+  const gainValues = traces
     .filter((t) => t.yaxis === "y2")
     .flatMap((t) => (Array.isArray(t.y) ? t.y : []))
     .filter(isNum);
@@ -890,8 +1273,8 @@ function drawLine(payload, selected) {
     }
   }
 
-  const gainMin = gainSeries.length ? Math.min(...gainSeries) : 0;
-  const gainMax = gainSeries.length ? Math.max(...gainSeries) : 10;
+  const gainMin = gainValues.length ? Math.min(...gainValues) : 0;
+  const gainMax = gainValues.length ? Math.max(...gainValues) : 10;
 
   renderPlot(
     "chart-line",
@@ -997,10 +1380,6 @@ function drawGroupedBar(payload, selected) {
       type: "bar",
       name: "Mesh",
       marker: { color: "#9b5cff" },
-      // text: vals.map((v) => (v != null ? `${Math.round(v)}` : "")),
-      // textposition: "outside",
-      // textfont: { size: 14, color: "#f8fafc" },
-      // cliponaxis: false,
       hovertemplate: "%{x}<br>Mesh: %{y:.1f} " + payload.meta.unit + "<extra></extra>",
     });
   }
@@ -1013,10 +1392,6 @@ function drawGroupedBar(payload, selected) {
       type: "bar",
       name: "Standalone",
       marker: { color: "#00d5ff" },
-      // text: vals.map((v) => (v != null ? `${Math.round(v)}` : "")),
-      // textposition: "outside",
-      // textfont: { size: 14, color: "#f8fafc" },
-      // cliponaxis: false,
       hovertemplate: "%{x}<br>Standalone: %{y:.1f} " + payload.meta.unit + "<extra></extra>",
     });
   }
@@ -1047,7 +1422,7 @@ function drawGroupedBar(payload, selected) {
 
 function drawAreaCoverage(payload, selected) {
   const router = primaryRouter(selected);
-  const distances = payload.meta.distances || [];
+  const distances = getActiveDistances(payload);
   const unit = payload.meta.unit;
 
   if (!router || !distances.length) {
@@ -1276,10 +1651,6 @@ function drawCoverage(payload, selected) {
       type: "bar",
       name: "Mesh",
       marker: { color: "#8b5cf6" },
-      // text: rows.map((r) => `${r.coverage_mesh ?? r.coverage ?? 0}`),
-      // textposition: "outside",
-      // textfont: { size: 13, color: "#f8fafc" },
-      // cliponaxis: false,
       hovertemplate: "%{x}<br>Mesh: %{y}/8 bands<extra></extra>",
     });
   }
@@ -1291,10 +1662,6 @@ function drawCoverage(payload, selected) {
       type: "bar",
       name: "Standalone",
       marker: { color: "#38bdf8" },
-      // text: rows.map((r) => `${r.coverage_nomesh ?? 0}`),
-      // textposition: "outside",
-      // textfont: { size: 13, color: "#f8fafc" },
-      // cliponaxis: false,
       hovertemplate: "%{x}<br>Standalone: %{y}/8 bands<extra></extra>",
     });
   }
@@ -1303,28 +1670,28 @@ function drawCoverage(payload, selected) {
     "chart-coverage",
     traces,
     {
-  ...PLOTLY_BASE,
-  barmode: "group",
-  xaxis: {
-          ...PLOTLY_BASE.xaxis,
-          title: "Router",
-          tickangle: 22,
-          tickfont: { size: 11 },
-        },
-        yaxis: {
-          ...PLOTLY_BASE.yaxis,
-          title: "Usable bands",
-          range: [0, 8.8],
-          tickfont: { size: 11 },
-        },
-        legend: {
-          ...PLOTLY_BASE.legend,
-          y: -0.18,
-          font: { size: 11, color: "#dbe4ff" },
-        },
-        height: 320,
-        margin: { l: 58, r: 16, t: 12, b: 92 },
+      ...PLOTLY_BASE,
+      barmode: "group",
+      xaxis: {
+        ...PLOTLY_BASE.xaxis,
+        title: "Router",
+        tickangle: 22,
+        tickfont: { size: 11 },
       },
+      yaxis: {
+        ...PLOTLY_BASE.yaxis,
+        title: "Usable bands",
+        range: [0, 8.8],
+        tickfont: { size: 11 },
+      },
+      legend: {
+        ...PLOTLY_BASE.legend,
+        y: -0.18,
+        font: { size: 11, color: "#dbe4ff" },
+      },
+      height: 320,
+      margin: { l: 58, r: 16, t: 12, b: 92 },
+    },
     CFG
   );
 }
@@ -1393,7 +1760,7 @@ function drawDropoff(payload, selected) {
 }
 
 function drawHeatmapCompare(payload, selected, mode, containerId) {
-  const distances = payload.meta.distances || [];
+  const distances = getActiveDistances(payload);
   const unit = payload.meta.unit;
 
   if ((mode === "mesh" && !wantsMesh()) || (mode === "nomesh" && !wantsNoMesh())) {
@@ -1619,8 +1986,8 @@ function renderAll() {
     ["chart-heatmap-mesh", () => drawHeatmapCompare(p, selected, "mesh", "chart-heatmap-mesh")],
     ["chart-heatmap-nomesh", () => drawHeatmapCompare(p, selected, "nomesh", "chart-heatmap-nomesh")],
     ["chart-rank-mesh", () => drawDualRankings(p, selected)],
+    ["chart-zone-coverage", () => drawZoneCoverageChart(p, selected)],
   ];
-
   sections.forEach(([chartId, fn]) => {
     try {
       fn();
@@ -1629,12 +1996,12 @@ function renderAll() {
       renderEmptyState(chartId, "Could not render this chart");
     }
   });
-
+  renderZoneLeaderboards(p, selected);
   updateTable(p, selected);
 
   const caption = getEl("sidebar-caption");
   if (caption) {
-    caption.textContent = `${p.routers.length} routers · ${p.meta.floor} · ${p.meta.band}`;
+    caption.textContent = `${p.routers.length} routers · ${p.meta.floor} · ${p.meta.band} · up to ${state.maxDistance} ft`;
   }
 }
 
@@ -1708,6 +2075,14 @@ async function boot() {
     state.routers = routers.slice(0, Math.min(5, routers.length));
 
     setMetricThresholdDefaults();
+
+    const distanceSlider = getEl("distance-slider");
+    const distanceLabel = getEl("distance-label");
+    if (distanceSlider && distanceLabel) {
+      distanceSlider.value = String(state.maxDistance);
+      distanceLabel.textContent = `${state.maxDistance} ft`;
+    }
+
     buildRouterSelect(state.allRouters);
 
     setActivePills("metric-pills", state.metric);

@@ -7,7 +7,7 @@
 
   <link rel="stylesheet" href="/static/dashboard.css?v=20260413-7" />
   <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.30.0/plotly.min.js"></script>
-  <script defer src="/static/dashboard.js?v=20260413-7"></script>
+  <script defer src="/static/dashboard.js?v=20260413-11"></script>
 </head>
 <body data-api-base="./api/">
   <div class="page">
@@ -84,6 +84,15 @@
         </div>
       </div>
 
+      <div class="ctrl-group">
+        <div class="ctrl-label">Distance range</div>
+        <div class="threshold-row">
+          <input type="range" id="distance-slider" min="10" max="70" value="70" step="10" />
+          <span class="threshold-val" id="distance-label">70 ft</span>
+        </div>
+        <div class="sidebar-caption">Analyze router performance only up to the selected distance.</div>
+      </div>
+
       <div class="sidebar-divider"></div>
       <div class="sidebar-caption" id="sidebar-caption">Loading data…</div>
     </aside>
@@ -115,7 +124,7 @@
           <div class="best-router-meta" id="best-router-meta">—</div>
         </div>
       </section>
-      
+
       <!-- <section class="kpi-row">
         <div class="kpi">
           <div class="kpi-label">Best avg with mesh</div>
