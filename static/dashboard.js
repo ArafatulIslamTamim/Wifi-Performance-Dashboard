@@ -15,36 +15,41 @@ const state = {
   routerOptions: [],
 };
 
-const COLORS = ["#8b5cf6", "#38bdf8", "#34d399", "#f59e0b", "#f87171", "#fb7185"];
+const COLORS = [
+  "#8b5cf6",
+  "#22d3ee",
+  "#f472b6",
+  "#2dd4bf",
+  "#fbbf24",
+  "#60a5fa",
+];
 
 const CHART_IDS = [
   "chart-line",
   "chart-bar",
   "chart-radar",
-  "chart-coverage",
   "chart-dropoff",
   "chart-heatmap-mesh",
   "chart-heatmap-nomesh",
   "chart-cdf",
   "chart-rank-mesh",
   "chart-rank-nomesh",
-
 ];
 
 const PALETTE = [
-  { mesh: "#8b5cf6", nomesh: "#a78bfa", gain: "rgba(139,92,246,0.16)" },
-  { mesh: "#38bdf8", nomesh: "#67e8f9", gain: "rgba(56,189,248,0.16)" },
-  { mesh: "#34d399", nomesh: "#6ee7b7", gain: "rgba(52,211,153,0.16)" },
-  { mesh: "#f59e0b", nomesh: "#fbbf24", gain: "rgba(245,158,11,0.16)" },
-  { mesh: "#fb7185", nomesh: "#fda4af", gain: "rgba(251,113,133,0.16)" },
-  { mesh: "#22c55e", nomesh: "#86efac", gain: "rgba(34,197,94,0.16)" },
+  { mesh: "#8b5cf6", nomesh: "#22d3ee", gain: "rgba(139,92,246,0.22)" },
+  { mesh: "#f472b6", nomesh: "#60a5fa", gain: "rgba(244,114,182,0.20)" },
+  { mesh: "#2dd4bf", nomesh: "#93c5fd", gain: "rgba(45,212,191,0.18)" },
+  { mesh: "#fbbf24", nomesh: "#f472b6", gain: "rgba(251,191,36,0.20)" },
+  { mesh: "#38bdf8", nomesh: "#c084fc", gain: "rgba(56,189,248,0.18)" },
+  { mesh: "#fb7185", nomesh: "#67e8f9", gain: "rgba(251,113,133,0.18)" },
 ];
 
 const PLOTLY_BASE = {
   paper_bgcolor: "rgba(0,0,0,0)",
-  plot_bgcolor: "#11172b",
+  plot_bgcolor: "rgba(10, 14, 30, 0.55)",
   font: {
-    color: "#e5e7eb",
+    color: "#eaf2ff",
     family: "Inter, Arial, sans-serif",
     size: 14,
   },
@@ -59,31 +64,31 @@ const PLOTLY_BASE = {
     font: {
       family: "Inter, Arial, sans-serif",
       size: 11,
-      color: "#dbe4ff",
+      color: "#dbe7ff",
     },
     itemwidth: 30,
   },
   hoverlabel: {
-    bgcolor: "#111827",
-    bordercolor: "#334155",
+    bgcolor: "#0b1124",
+    bordercolor: "rgba(96,165,250,0.32)",
     font: {
       family: "Inter, Arial, sans-serif",
-      color: "#f8fafc",
+      color: "#f8fbff",
       size: 12,
     },
   },
   xaxis: {
-    gridcolor: "rgba(255,255,255,0.07)",
-    zerolinecolor: "rgba(255,255,255,0.07)",
-    tickfont: { size: 11, color: "#dbe4ff" },
-    titlefont: { size: 13, color: "#f8fafc" },
+    gridcolor: "rgba(130, 160, 255, 0.08)",
+    zerolinecolor: "rgba(130, 160, 255, 0.08)",
+    tickfont: { size: 11, color: "#dbe7ff" },
+    titlefont: { size: 13, color: "#f8fbff" },
     automargin: true,
   },
   yaxis: {
-    gridcolor: "rgba(255,255,255,0.07)",
-    zerolinecolor: "rgba(255,255,255,0.07)",
-    tickfont: { size: 11, color: "#dbe4ff" },
-    titlefont: { size: 13, color: "#f8fafc" },
+    gridcolor: "rgba(130, 160, 255, 0.08)",
+    zerolinecolor: "rgba(130, 160, 255, 0.08)",
+    tickfont: { size: 11, color: "#dbe7ff" },
+    titlefont: { size: 13, color: "#f8fbff" },
     automargin: true,
   },
 };
@@ -113,7 +118,7 @@ function routerLabel(name) {
 
 function topologyLabel(value) {
   if (value === "with_mesh") return "Mesh";
-  if (value === "without_mesh") return "No mesh";
+  if (value === "without_mesh") return "Standalone";
   return "Both";
 }
 
@@ -238,6 +243,26 @@ function formatPillLabel(value, stateKey) {
   }
   if (stateKey === "topology") return topologyLabel(value);
   return value;
+}
+
+function getSignalQualityLabel(value) {
+  if (!isNum(value)) return "";
+  if (value >= -50) return "Excellent";
+  if (value >= -60) return "Good";
+  if (value >= -70) return "Weak";
+  return "Poor";
+}
+
+function formatMetricValue(value, unit, includeQuality = false) {
+  if (!isNum(value)) return "—";
+
+  const base = `${value.toFixed(1)} ${unit}`;
+
+  if (includeQuality && state.metric === "signal_strength") {
+    return `${base} (${getSignalQualityLabel(value)})`;
+  }
+
+  return base;
 }
 
 function buildPills(containerId, values, stateKey) {
@@ -466,6 +491,61 @@ function getSummaryRowMap(payload) {
   return map;
 }
 
+function renderBestRouter(payload, selected) {
+  const nameEl = getEl("best-router-name");
+  const reasonEl = getEl("best-router-reason");
+  const metaEl = getEl("best-router-meta");
+
+  if (!nameEl || !reasonEl || !metaEl) return;
+
+  const rowMap = getSummaryRowMap(payload);
+  const rows = selected.map((router) => rowMap[router]).filter(Boolean);
+
+  if (!rows.length) {
+    nameEl.textContent = "—";
+    reasonEl.textContent = "No router data available for the current filters.";
+    metaEl.textContent = "—";
+    return;
+  }
+
+  let bestRow = null;
+  let bestValue = null;
+
+  if (currentMode() === "without_mesh") {
+    bestRow = [...rows]
+      .filter((r) => isNum(r.avg_nomesh))
+      .sort((a, b) => b.avg_nomesh - a.avg_nomesh)[0];
+    bestValue = bestRow?.avg_nomesh ?? null;
+  } else {
+    bestRow = [...rows]
+      .filter((r) => isNum(r.avg_mesh))
+      .sort((a, b) => b.avg_mesh - a.avg_mesh)[0];
+    bestValue = bestRow?.avg_mesh ?? null;
+  }
+
+  if (!bestRow || !isNum(bestValue)) {
+    nameEl.textContent = "—";
+    reasonEl.textContent = "No router has enough data for this view.";
+    metaEl.textContent = "—";
+    return;
+  }
+
+  nameEl.textContent = routerLabel(bestRow.router);
+
+  if (currentMode() === "without_mesh") {
+    reasonEl.textContent = `Best standalone average on ${payload.meta.band} at ${payload.meta.floor}.`;
+    metaEl.textContent = `Average: ${formatMetricValue(bestRow.avg_nomesh, payload.meta.unit, true)}`;
+    return;
+  }
+
+  const boostText = isNum(bestRow.gain_abs)
+    ? ` · Mesh Boost: ${bestRow.gain_abs >= 0 ? "+" : ""}${bestRow.gain_abs.toFixed(1)} ${payload.meta.unit}`
+    : "";
+
+  reasonEl.textContent = `Best mesh-assisted average on ${payload.meta.band} at ${payload.meta.floor}.`;
+  metaEl.textContent = `Average: ${formatMetricValue(bestRow.avg_mesh, payload.meta.unit, true)}${boostText}`;
+}
+
 function getComparisonSeries(payload, router) {
   const compare = payload.series_compare?.[router];
   if (compare) {
@@ -647,7 +727,23 @@ function updateTable(payload, selected) {
   const rows = selected
     .map((router) => rowMap[router])
     .filter(Boolean)
-    .sort((a, b) => (b.gain_abs ?? b.avg_mesh ?? b.avg ?? 0) - (a.gain_abs ?? a.avg_mesh ?? a.avg ?? 0));
+    .sort((a, b) => {
+      const aVal =
+        currentMode() === "without_mesh"
+          ? (a.avg_nomesh ?? -Infinity)
+          : currentMode() === "with_mesh"
+          ? (a.avg_mesh ?? -Infinity)
+          : (a.gain_abs ?? a.avg_mesh ?? -Infinity);
+
+      const bVal =
+        currentMode() === "without_mesh"
+          ? (b.avg_nomesh ?? -Infinity)
+          : currentMode() === "with_mesh"
+          ? (b.avg_mesh ?? -Infinity)
+          : (b.gain_abs ?? b.avg_mesh ?? -Infinity);
+
+      return bVal - aVal;
+    });
 
   tbody.innerHTML = "";
 
@@ -660,10 +756,10 @@ function updateTable(payload, selected) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${routerLabel(row.router)}</td>
-      <td>${isNum(row.avg_mesh) ? `${row.avg_mesh.toFixed(1)} ${payload.meta.unit}` : "—"}</td>
-      <td>${isNum(row.avg_nomesh) ? `${row.avg_nomesh.toFixed(1)} ${payload.meta.unit}` : "—"}</td>
-      <td>${isNum(row.gain_abs) ? `${row.gain_abs.toFixed(1)} ${payload.meta.unit}` : "—"}</td>
-      <td>${isNum(row.peak_mesh) ? `${row.peak_mesh.toFixed(1)} ${payload.meta.unit}` : "—"}</td>
+      <td>${formatMetricValue(row.avg_mesh, payload.meta.unit, true)}</td>
+      <td>${formatMetricValue(row.avg_nomesh, payload.meta.unit, true)}</td>
+      <td>${isNum(row.gain_abs) ? `${row.gain_abs >= 0 ? "+" : ""}${row.gain_abs.toFixed(1)} ${payload.meta.unit}` : "—"}</td>
+      <td>${formatMetricValue(row.peak_mesh, payload.meta.unit, true)}</td>
       <td>${isNum(row.coverage_mesh) ? `${row.coverage_mesh}/8` : "—"}</td>
       <td>${isNum(row.drop_mesh_total) ? `${row.drop_mesh_total.toFixed(1)} ${payload.meta.unit}` : "—"}</td>
     `;
@@ -716,7 +812,7 @@ function drawLine(payload, selected) {
         y: mesh,
         type: "scatter",
         mode: "lines+markers",
-        name: `${label} · with mesh`,
+        name: `${label} · Mesh`,
         line: {
           color: colors.mesh,
           width: 3.5,
@@ -730,7 +826,7 @@ function drawLine(payload, selected) {
         },
         hovertemplate:
           `<b>${label}</b><br>` +
-          `With mesh: %{y:.1f} ${unit}<br>` +
+          `Mesh: %{y:.1f} ${unit}<br>` +
           `%{x} ft<extra></extra>`,
       });
     }
@@ -741,7 +837,7 @@ function drawLine(payload, selected) {
         y: nomesh,
         type: "scatter",
         mode: "lines+markers",
-        name: `${label} · without mesh`,
+        name: `${label} · Standalone`,
         line: {
           color: colors.nomesh,
           width: 2.4,
@@ -757,7 +853,7 @@ function drawLine(payload, selected) {
         opacity: 0.95,
         hovertemplate:
           `<b>${label}</b><br>` +
-          `Without mesh: %{y:.1f} ${unit}<br>` +
+          `Standalone: %{y:.1f} ${unit}<br>` +
           `%{x} ft<extra></extra>`,
       });
     }
@@ -839,7 +935,7 @@ function drawLine(payload, selected) {
         bgcolor: "rgba(0,0,0,0)",
         font: { size: 13, color: "#dbe4ff" },
       },
-      hovermode: "x unified",
+      hovermode: "closest",
       hoverlabel: {
         bgcolor: "#0f172a",
         bordercolor: "#334155",
@@ -854,7 +950,7 @@ function drawLine(payload, selected) {
                 x1: distances[distances.length - 1],
                 y0: payload.meta.threshold,
                 y1: payload.meta.threshold,
-                line: { color: "#f59e0b", width: 1.8, dash: "dash" },
+                line: { color: "#fbbf24", width: 1.8, dash: "dash" },
               },
             ]
           : [],
@@ -868,7 +964,7 @@ function drawLine(payload, selected) {
                 yanchor: "bottom",
                 text: `Threshold ${Math.round(payload.meta.threshold)} ${unit}`,
                 showarrow: false,
-                font: { size: 13, color: "#fbbf24" },
+                font: { size: 13, color: "#fde68a" },
                 bgcolor: "rgba(15,23,42,0.86)",
                 bordercolor: "rgba(245,158,11,0.35)",
                 borderwidth: 1,
@@ -899,13 +995,13 @@ function drawGroupedBar(payload, selected) {
       x: labels,
       y: vals,
       type: "bar",
-      name: "With mesh",
+      name: "Mesh",
       marker: { color: "#8b5cf6" },
       // text: vals.map((v) => (v != null ? `${Math.round(v)}` : "")),
       // textposition: "outside",
       // textfont: { size: 14, color: "#f8fafc" },
       // cliponaxis: false,
-      hovertemplate: "%{x}<br>With mesh: %{y:.1f} " + payload.meta.unit + "<extra></extra>",
+      hovertemplate: "%{x}<br>Mesh: %{y:.1f} " + payload.meta.unit + "<extra></extra>",
     });
   }
 
@@ -915,13 +1011,13 @@ function drawGroupedBar(payload, selected) {
       x: labels,
       y: vals,
       type: "bar",
-      name: "Without mesh",
+      name: "Standalone",
       marker: { color: "#38bdf8" },
       // text: vals.map((v) => (v != null ? `${Math.round(v)}` : "")),
       // textposition: "outside",
       // textfont: { size: 14, color: "#f8fafc" },
       // cliponaxis: false,
-      hovertemplate: "%{x}<br>Without mesh: %{y:.1f} " + payload.meta.unit + "<extra></extra>",
+      hovertemplate: "%{x}<br>Standalone: %{y:.1f} " + payload.meta.unit + "<extra></extra>",
     });
   }
 
@@ -969,12 +1065,12 @@ function drawAreaCoverage(payload, selected) {
       y: mesh,
       type: "scatter",
       mode: "lines+markers",
-      name: `${label} · with mesh`,
+      name: `${label} · Mesh`,
       line: { color: "#8b5cf6", width: 3.2, shape: "spline", smoothing: 0.8 },
       marker: { size: 6.5, color: "#8b5cf6" },
       fill: "tozeroy",
       fillcolor: "rgba(139,92,246,0.16)",
-      hovertemplate: `<b>${label}</b><br>With mesh: %{y:.1f} ${unit}<br>%{x} ft<extra></extra>`,
+      hovertemplate: `<b>${label}</b><br>Mesh: %{y:.1f} ${unit}<br>%{x} ft<extra></extra>`,
     });
   }
 
@@ -984,12 +1080,12 @@ function drawAreaCoverage(payload, selected) {
       y: nomesh,
       type: "scatter",
       mode: "lines+markers",
-      name: `${label} · without mesh`,
+      name: `${label} · Standalone`,
       line: { color: "#38bdf8", width: 2.2, dash: "dot", shape: "spline", smoothing: 0.8 },
       marker: { size: 5.5, color: "#38bdf8" },
       fill: "tozeroy",
       fillcolor: "rgba(56,189,248,0.10)",
-      hovertemplate: `<b>${label}</b><br>Without mesh: %{y:.1f} ${unit}<br>%{x} ft<extra></extra>`,
+      hovertemplate: `<b>${label}</b><br>Standalone: %{y:.1f} ${unit}<br>%{x} ft<extra></extra>`,
     });
   }
 
@@ -1021,7 +1117,7 @@ function drawAreaCoverage(payload, selected) {
                 x1: distances[distances.length - 1],
                 y0: payload.meta.threshold,
                 y1: payload.meta.threshold,
-                line: { color: "#f59e0b", width: 1.5, dash: "dash" },
+                line: { color: "#fbbf24", width: 1.5, dash: "dash" },
               },
             ]
           : [],
@@ -1045,15 +1141,15 @@ function drawCoverageDonut(payload, selected) {
   let colors = [];
 
   if (currentMode() === "both") {
-    labels = ["With mesh", "Without mesh"];
+    labels = ["Mesh", "Standalone"];
     values = [Math.max(0, row.coverage_mesh ?? row.coverage ?? 0), Math.max(0, row.coverage_nomesh ?? 0)];
     colors = ["#8b5cf6", "#38bdf8"];
   } else if (currentMode() === "with_mesh") {
-    labels = ["With mesh"];
+    labels = ["Mesh"];
     values = [Math.max(0, row.coverage_mesh ?? row.coverage ?? 0)];
     colors = ["#8b5cf6"];
   } else {
-    labels = ["Without mesh"];
+    labels = ["Standalone"];
     values = [Math.max(0, row.coverage_nomesh ?? 0)];
     colors = ["#38bdf8"];
   }
@@ -1178,13 +1274,13 @@ function drawCoverage(payload, selected) {
       x: labels,
       y: rows.map((r) => r.coverage_mesh ?? r.coverage ?? 0),
       type: "bar",
-      name: "With mesh",
+      name: "Mesh",
       marker: { color: "#8b5cf6" },
       // text: rows.map((r) => `${r.coverage_mesh ?? r.coverage ?? 0}`),
       // textposition: "outside",
       // textfont: { size: 13, color: "#f8fafc" },
       // cliponaxis: false,
-      hovertemplate: "%{x}<br>With mesh: %{y}/8 bands<extra></extra>",
+      hovertemplate: "%{x}<br>Mesh: %{y}/8 bands<extra></extra>",
     });
   }
 
@@ -1193,13 +1289,13 @@ function drawCoverage(payload, selected) {
       x: labels,
       y: rows.map((r) => r.coverage_nomesh ?? 0),
       type: "bar",
-      name: "Without mesh",
+      name: "Standalone",
       marker: { color: "#38bdf8" },
       // text: rows.map((r) => `${r.coverage_nomesh ?? 0}`),
       // textposition: "outside",
       // textfont: { size: 13, color: "#f8fafc" },
       // cliponaxis: false,
-      hovertemplate: "%{x}<br>Without mesh: %{y}/8 bands<extra></extra>",
+      hovertemplate: "%{x}<br>Standalone: %{y}/8 bands<extra></extra>",
     });
   }
 
@@ -1265,13 +1361,9 @@ function drawDropoff(payload, selected) {
       x: labels,
       y: rows.map((r) => r.drop_nomesh_total ?? 0),
       type: "bar",
-      name: "Without mesh",
-      marker: { color: "#f87171" },
-      // text: rows.map((r) => `${(r.drop_nomesh_total ?? 0).toFixed(1)}`),
-      // textposition: "outside",
-      // textfont: { size: 13, color: "#f8fafc" },
-      // cliponaxis: false,
-      hovertemplate: "%{x}<br>Without mesh drop: %{y:.1f} " + payload.meta.unit + "<extra></extra>",
+      name: "Standalone",
+      marker: { color: "#22d3ee" },
+      hovertemplate: "%{x}<br>Standalone drop: %{y:.1f} " + payload.meta.unit + "<extra></extra>",
     });
   }
 
@@ -1311,7 +1403,9 @@ function drawHeatmapCompare(payload, selected, mode, containerId) {
   if ((mode === "mesh" && !wantsMesh()) || (mode === "nomesh" && !wantsNoMesh())) {
     renderEmptyState(
       containerId,
-      mode === "mesh" ? "Mesh view hidden by topology filter" : "No-mesh view hidden by topology filter",
+      mode === "mesh"
+        ? "Select Both or Mesh in the Topology filter to see this view"
+        : "Select Both or Standalone in the Topology filter to see this view",
       320
     );
     return;
@@ -1332,8 +1426,8 @@ function drawHeatmapCompare(payload, selected, mode, containerId) {
     renderEmptyState(
       containerId,
       mode === "nomesh"
-        ? "No without-mesh comparison data available"
-        : "No with-mesh heatmap data available",
+        ? "No standalone comparison data available"
+        : "No mesh heatmap data available",
       320
     );
     return;
@@ -1397,9 +1491,9 @@ function drawCDF(payload, selected) {
           y: meshVals.map((_, i) => ((i + 1) / meshVals.length) * 100),
           type: "scatter",
           mode: "lines",
-          name: `${label} · with mesh`,
+          name: `${label} · Mesh`,
           line: { color, width: 2.8 },
-          hovertemplate: `${label}<br>With mesh: %{x:.1f} ${unit} → %{y:.1f}%<extra></extra>`,
+          hovertemplate: `${label}<br>Mesh: %{x:.1f} ${unit} → %{y:.1f}%<extra></extra>`,
         });
       }
     }
@@ -1413,10 +1507,10 @@ function drawCDF(payload, selected) {
           y: nomeshVals.map((_, i) => ((i + 1) / nomeshVals.length) * 100),
           type: "scatter",
           mode: "lines",
-          name: `${label} · without mesh`,
+          name: `${label} · Standalone`,
           line: { color, width: 2.2, dash: "dot" },
           opacity: 0.82,
-          hovertemplate: `${label}<br>Without mesh: %{x:.1f} ${unit} → %{y:.1f}%<extra></extra>`,
+          hovertemplate: `${label}<br>Standalone: %{x:.1f} ${unit} → %{y:.1f}%<extra></extra>`,
         });
       }
     }
@@ -1429,7 +1523,7 @@ function drawCDF(payload, selected) {
       type: "scatter",
       mode: "lines",
       name: "Threshold",
-      line: { color: "#f59e0b", width: 1.5, dash: "dash" },
+      line: { color: "#fbbf24", width: 1.5, dash: "dash" },
       hoverinfo: "skip",
     });
   }
@@ -1518,13 +1612,13 @@ function renderAll() {
   if (!selected.length) return;
 
   updateHero(p, selected);
+  renderBestRouter(p, selected);
   updateKPIs(p, selected);
 
   const sections = [
     ["chart-line", () => drawLine(p, selected)],
     ["chart-bar", () => drawGroupedBar(p, selected)],
     ["chart-radar", () => drawRadar(p, selected)],
-    ["chart-coverage", () => drawCoverage(p, selected)],
     ["chart-dropoff", () => drawDropoff(p, selected)],
     ["chart-heatmap-mesh", () => drawHeatmapCompare(p, selected, "mesh", "chart-heatmap-mesh")],
     ["chart-heatmap-nomesh", () => drawHeatmapCompare(p, selected, "nomesh", "chart-heatmap-nomesh")],

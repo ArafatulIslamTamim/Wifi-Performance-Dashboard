@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>WiFi Performance Dashboard</title>
 
-  <link rel="stylesheet" href="/static/dashboard.css?v=20260403-4" />
+  <link rel="stylesheet" href="/static/dashboard.css?v=20260413-6" />
   <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist@2.30.0/plotly.min.js"></script>
-  <script defer src="/static/dashboard.js?v=20260403-3"></script>
+  <script defer src="/static/dashboard.js?v=20260413-6"></script>
 </head>
 <body data-api-base="./api/">
   <div class="page">
@@ -21,7 +21,13 @@
       </div>
 
       <div class="ctrl-group">
-        <div class="ctrl-label">Frequency band</div>
+        <div class="ctrl-label-row">
+          <div class="ctrl-label">Frequency band</div>
+          <span class="info-tip" tabindex="0">
+            ?
+            <span class="info-tip-text">Choose which radio band results to compare: 2.4 GHz or 5 GHz.</span>
+          </span>
+        </div>
         <div class="ctrl-pills" id="band-pills"></div>
       </div>
 
@@ -31,7 +37,13 @@
       </div>
       
       <div class="ctrl-group">
-        <div class="ctrl-label">Topology</div>
+        <div class="ctrl-label-row">
+          <div class="ctrl-label">Topology</div>
+          <span class="info-tip" tabindex="0">
+            ?
+            <span class="info-tip-text">Choose whether to compare mesh-assisted, standalone, or both deployment modes.</span>
+          </span>
+        </div>
         <div class="ctrl-pills" id="topology-pills"></div>
       </div>
 
@@ -59,7 +71,13 @@
       </div>
 
       <div class="ctrl-group">
-        <div class="ctrl-label">Coverage threshold</div>
+        <div class="ctrl-label-row">
+          <div class="ctrl-label">Coverage threshold</div>
+          <span class="info-tip" tabindex="0">
+            ?
+            <span class="info-tip-text">Sets the minimum throughput or RSSI level treated as usable coverage for the current metric.</span>
+          </span>
+        </div>
         <div class="threshold-row">
           <input type="range" id="threshold-slider" min="0" max="1500" value="500" step="25" />
           <span class="threshold-val" id="threshold-label">500</span>
@@ -75,13 +93,26 @@
 
       <section class="hero">
         <h1>WiFi Performance Dashboard</h1>
-        <p>Single dashboard page for comparing with-mesh and without-mesh performance using pre-stored CSV data.</p>
+        <p>
+          Compare RF signal performance across FWA routers under mesh-assisted and standalone deployments.
+          Metrics include RSSI and throughput measured at incremental distances on 2.4 GHz and 5 GHz bands.
+        </p>
+        <p class="hero-setup">Test Setup: Router on Ground Floor · Mesh node on Lower Floor</p>
+
         <div class="badges">
           <span class="badge badge-purple" id="b-metric">Throughput</span>
           <span class="badge badge-blue" id="b-floor">—</span>
           <span class="badge badge-green" id="b-band">—</span>
           <span class="badge badge-amber" id="b-threshold">—</span>
+          <span class="badge badge-purple" id="b-topology">Both</span>
           <span class="badge badge-purple" id="b-routers">—</span>
+        </div>
+
+        <div class="best-router-card" id="best-router-card">
+          <div class="best-router-label">Best Router</div>
+          <div class="best-router-name" id="best-router-name">—</div>
+          <div class="best-router-reason" id="best-router-reason">Loading recommendation…</div>
+          <div class="best-router-meta" id="best-router-meta">—</div>
         </div>
       </section>
 
@@ -118,7 +149,7 @@
 
       <section class="section-header">
         <div class="section-title">Router comparison vs distance</div>
-        <div class="section-sub">Solid = with mesh · dotted = without mesh · threshold line shown when enabled</div>
+        <div class="section-sub">Solid = mesh-assisted · dotted = standalone · threshold line shown when enabled</div>
       </section>
       <section class="chart-grid-2">
         <article class="chart-card">
@@ -151,24 +182,20 @@
         </div>
       </div> -->
 
-      <section class="chart-grid-3">
+      <section class="chart-grid-equal">
         <article class="chart-card">
           <div class="chart-title">PERFORMANCE RADAR</div>
           <div id="chart-radar" class="chart-box chart-box-sm"></div>
         </article>
         <article class="chart-card">
-          <div class="chart-title">COVERAGE BANDS ≥ THRESHOLD</div>
-          <div id="chart-coverage" class="chart-box chart-box-sm"></div>
-        </article>
-        <article class="chart-card">
-          <div class="chart-title">TOTAL DROP-OFF</div>
+          <div class="chart-title">SIGNAL DROP OVER DISTANCE</div>
           <div id="chart-dropoff" class="chart-box chart-box-sm"></div>
         </article>
       </section>
 
     <div class="section-header">
         <div class="section-title">Coverage depth</div>
-        <div class="section-sub">Dual heatmaps for with-mesh and without-mesh plus cumulative distribution</div>
+        <div class="section-sub">Dual heatmaps for mesh-assisted and standalone deployments</div>
       </div>
       <div class="chart-grid-equal">
         <div class="chart-card">
@@ -176,7 +203,7 @@
           <div id="chart-heatmap-mesh" class="chart-box chart-box-md"></div>
         </div>
         <div class="chart-card">
-          <div class="chart-title">HEATMAP — WITHOUT MESH</div>
+          <div class="chart-title">HEATMAP — STANDALONE</div>
           <div id="chart-heatmap-nomesh" class="chart-box chart-box-md"></div>
         </div>
       </div> <div class="section-header">
@@ -189,7 +216,7 @@
           <div id="chart-rank-mesh" class="chart-box chart-box-md"></div>
         </div>
         <div class="chart-card">
-          <div class="chart-title">RANKING — WITHOUT MESH</div>
+          <div class="chart-title">RANKING — STANDALONE</div>
           <div id="chart-rank-nomesh" class="chart-box chart-box-md"></div>
         </div>
              <section class="section-header">
@@ -200,14 +227,14 @@
          <table class="summary-table">
            <thead>
              <tr>
-               <th>Router</th>
-               <th>Avg mesh</th>
-               <th>Avg no mesh</th>
-               <th>Mesh Improvement</th>
-               <th>Peak mesh</th>
-               <th>Coverage</th>
-               <th>Drop total</th>
-             </tr>
+              <th>Router</th>
+              <th>Average Mesh</th>
+              <th>Average Standalone</th>
+              <th>Mesh Boost</th>
+              <th>Peak Mesh</th>
+              <th>Mesh Coverage</th>
+              <th>Signal Drop Over Distance</th>
+            </tr>
            </thead>
            <tbody id="summary-tbody">
              <tr>
