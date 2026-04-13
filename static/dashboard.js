@@ -16,12 +16,12 @@ const state = {
 };
 
 const COLORS = [
-  "#8b5cf6",
-  "#22d3ee",
-  "#f472b6",
-  "#2dd4bf",
-  "#fbbf24",
-  "#60a5fa",
+  "#9b5cff",
+  "#00d5ff",
+  "#ff2fb3",
+  "#ff8a00",
+  "#ffd400",
+  "#2f7bff",
 ];
 
 const CHART_IDS = [
@@ -37,19 +37,19 @@ const CHART_IDS = [
 ];
 
 const PALETTE = [
-  { mesh: "#8b5cf6", nomesh: "#22d3ee", gain: "rgba(139,92,246,0.22)" },
-  { mesh: "#f472b6", nomesh: "#60a5fa", gain: "rgba(244,114,182,0.20)" },
-  { mesh: "#2dd4bf", nomesh: "#93c5fd", gain: "rgba(45,212,191,0.18)" },
-  { mesh: "#fbbf24", nomesh: "#f472b6", gain: "rgba(251,191,36,0.20)" },
-  { mesh: "#38bdf8", nomesh: "#c084fc", gain: "rgba(56,189,248,0.18)" },
-  { mesh: "#fb7185", nomesh: "#67e8f9", gain: "rgba(251,113,133,0.18)" },
+  { mesh: "#9b5cff", nomesh: "#00d5ff", gain: "rgba(155,92,255,0.22)" },
+  { mesh: "#ff2fb3", nomesh: "#2f7bff", gain: "rgba(255,47,179,0.20)" },
+  { mesh: "#ff8a00", nomesh: "#ffd400", gain: "rgba(255,138,0,0.20)" },
+  { mesh: "#00d5ff", nomesh: "#9b5cff", gain: "rgba(0,213,255,0.18)" },
+  { mesh: "#ffd400", nomesh: "#ff2fb3", gain: "rgba(255,212,0,0.18)" },
+  { mesh: "#2f7bff", nomesh: "#36e7a1", gain: "rgba(47,123,255,0.18)" },
 ];
 
 const PLOTLY_BASE = {
   paper_bgcolor: "rgba(0,0,0,0)",
-  plot_bgcolor: "rgba(10, 14, 30, 0.55)",
+  plot_bgcolor: "rgba(20, 16, 38, 0.48)",
   font: {
-    color: "#eaf2ff",
+    color: "#eef3ff",
     family: "Inter, Arial, sans-serif",
     size: 14,
   },
@@ -64,13 +64,13 @@ const PLOTLY_BASE = {
     font: {
       family: "Inter, Arial, sans-serif",
       size: 11,
-      color: "#dbe7ff",
+      color: "#dfe7ff",
     },
     itemwidth: 30,
   },
   hoverlabel: {
-    bgcolor: "#0b1124",
-    bordercolor: "rgba(96,165,250,0.32)",
+    bgcolor: "#151327",
+    bordercolor: "rgba(155,92,255,0.28)",
     font: {
       family: "Inter, Arial, sans-serif",
       color: "#f8fbff",
@@ -78,16 +78,16 @@ const PLOTLY_BASE = {
     },
   },
   xaxis: {
-    gridcolor: "rgba(130, 160, 255, 0.08)",
-    zerolinecolor: "rgba(130, 160, 255, 0.08)",
-    tickfont: { size: 11, color: "#dbe7ff" },
+    gridcolor: "rgba(255,255,255,0.06)",
+    zerolinecolor: "rgba(255,255,255,0.06)",
+    tickfont: { size: 11, color: "#dfe7ff" },
     titlefont: { size: 13, color: "#f8fbff" },
     automargin: true,
   },
   yaxis: {
-    gridcolor: "rgba(130, 160, 255, 0.08)",
-    zerolinecolor: "rgba(130, 160, 255, 0.08)",
-    tickfont: { size: 11, color: "#dbe7ff" },
+    gridcolor: "rgba(255,255,255,0.06)",
+    zerolinecolor: "rgba(255,255,255,0.06)",
+    tickfont: { size: 11, color: "#dfe7ff" },
     titlefont: { size: 13, color: "#f8fbff" },
     automargin: true,
   },
@@ -455,8 +455,8 @@ function drawDualRankings(payload, selected) {
     );
   };
 
-  renderRank("chart-rank-mesh", "avg_mesh", "#8b5cf6");
-  renderRank("chart-rank-nomesh", "avg_nomesh", "#38bdf8");
+  renderRank("chart-rank-mesh", "avg_mesh", "#9b5cff");
+  renderRank("chart-rank-nomesh", "avg_nomesh", "#00d5ff");
 }
 
 function selectedRoutersFromPayload() {
@@ -996,7 +996,7 @@ function drawGroupedBar(payload, selected) {
       y: vals,
       type: "bar",
       name: "Mesh",
-      marker: { color: "#8b5cf6" },
+      marker: { color: "#9b5cff" },
       // text: vals.map((v) => (v != null ? `${Math.round(v)}` : "")),
       // textposition: "outside",
       // textfont: { size: 14, color: "#f8fafc" },
@@ -1012,7 +1012,7 @@ function drawGroupedBar(payload, selected) {
       y: vals,
       type: "bar",
       name: "Standalone",
-      marker: { color: "#38bdf8" },
+      marker: { color: "#00d5ff" },
       // text: vals.map((v) => (v != null ? `${Math.round(v)}` : "")),
       // textposition: "outside",
       // textfont: { size: 14, color: "#f8fafc" },
@@ -1346,13 +1346,9 @@ function drawDropoff(payload, selected) {
       x: labels,
       y: rows.map((r) => r.drop_mesh_total ?? r.drop_total ?? 0),
       type: "bar",
-      name: "With mesh",
-      marker: { color: "#8b5cf6" },
-      // text: rows.map((r) => `${(r.drop_mesh_total ?? r.drop_total ?? 0).toFixed(1)}`),
-      // textposition: "outside",
-      // textfont: { size: 13, color: "#f8fafc" },
-      // cliponaxis: false,
-      hovertemplate: "%{x}<br>With mesh drop: %{y:.1f} " + payload.meta.unit + "<extra></extra>",
+      name: "Mesh",
+      marker: { color: "#9b5cff" },
+      hovertemplate: "%{x}<br>Mesh drop: %{y:.1f} " + payload.meta.unit + "<extra></extra>",
     });
   }
 

@@ -7,47 +7,47 @@
 }
 
 :root {
-  --bg: #050816;
-  --bg2: #0a0f24;
-  --bg3: #11183a;
+  --bg: #0b0b16;
+  --bg2: #151327;
+  --bg3: #1d1833;
 
-  --surface: rgba(10, 14, 30, 0.72);
-  --surface-2: rgba(15, 20, 42, 0.82);
-  --card: rgba(17, 24, 39, 0.62);
+  --surface: rgba(17, 14, 32, 0.78);
+  --surface-2: rgba(23, 18, 42, 0.84);
+  --card: rgba(20, 16, 38, 0.72);
 
-  --border: rgba(130, 160, 255, 0.14);
-  --border2: rgba(168, 85, 247, 0.22);
+  --border: rgba(155, 92, 255, 0.18);
+  --border2: rgba(0, 213, 255, 0.18);
 
   --text: #f8fbff;
-  --muted: rgba(222, 232, 255, 0.78);
-  --hint: rgba(190, 205, 255, 0.52);
+  --muted: rgba(230, 236, 255, 0.78);
+  --hint: rgba(198, 206, 234, 0.56);
 
-  --purple: #8b5cf6;
-  --purple-soft: rgba(139, 92, 246, 0.22);
+  --purple: #9b5cff;
+  --purple-soft: rgba(155, 92, 255, 0.20);
 
-  --blue: #38bdf8;
-  --blue-soft: rgba(56, 189, 248, 0.22);
+  --blue: #2f7bff;
+  --blue-soft: rgba(47, 123, 255, 0.20);
 
-  --cyan: #22d3ee;
-  --cyan-soft: rgba(34, 211, 238, 0.20);
+  --cyan: #00d5ff;
+  --cyan-soft: rgba(0, 213, 255, 0.18);
 
-  --pink: #f472b6;
-  --pink-soft: rgba(244, 114, 182, 0.18);
+  --pink: #ff2fb3;
+  --pink-soft: rgba(255, 47, 179, 0.18);
 
-  --green: #2dd4bf;
-  --green-soft: rgba(45, 212, 191, 0.18);
+  --green: #36e7a1;
+  --green-soft: rgba(54, 231, 161, 0.16);
 
-  --amber: #fbbf24;
-  --amber-soft: rgba(251, 191, 36, 0.18);
+  --amber: #ff8a00;
+  --amber-soft: rgba(255, 138, 0, 0.18);
 
-  --red: #fb7185;
-  --red-soft: rgba(251, 113, 133, 0.18);
+  --red: #ff5a6b;
+  --red-soft: rgba(255, 90, 107, 0.16);
 
-  --shadow-lg: 0 24px 60px rgba(1, 6, 20, 0.55);
-  --shadow-md: 0 14px 34px rgba(2, 8, 28, 0.42);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.50);
+  --shadow-md: 0 14px 34px rgba(0, 0, 0, 0.36);
 
-  --glow-purple: 0 0 0 1px rgba(139, 92, 246, 0.18), 0 0 24px rgba(139, 92, 246, 0.14);
-  --glow-cyan: 0 0 0 1px rgba(34, 211, 238, 0.16), 0 0 24px rgba(34, 211, 238, 0.12);
+  --glow-purple: 0 0 0 1px rgba(155, 92, 255, 0.20), 0 0 26px rgba(155, 92, 255, 0.18);
+  --glow-cyan: 0 0 0 1px rgba(0, 213, 255, 0.18), 0 0 26px rgba(0, 213, 255, 0.14);
 
   --radius: 16px;
   --radius-lg: 22px;
@@ -57,10 +57,10 @@
 html,
 body {
   background:
-    radial-gradient(circle at 8% 10%, rgba(34, 211, 238, 0.16), transparent 18%),
-    radial-gradient(circle at 88% 6%, rgba(139, 92, 246, 0.18), transparent 22%),
-    radial-gradient(circle at 76% 78%, rgba(244, 114, 182, 0.10), transparent 20%),
-    linear-gradient(135deg, #040814 0%, #091127 42%, #101936 100%);
+    radial-gradient(circle at 12% 12%, rgba(0, 213, 255, 0.12), transparent 18%),
+    radial-gradient(circle at 85% 10%, rgba(155, 92, 255, 0.16), transparent 22%),
+    radial-gradient(circle at 78% 76%, rgba(255, 47, 179, 0.10), transparent 18%),
+    linear-gradient(135deg, #090913 0%, #141127 45%, #1a1530 100%);
   color: var(--text);
   font-family: "Inter", "Segoe UI", Arial, sans-serif;
   font-size: 14px;
@@ -643,17 +643,16 @@ a {
   margin-top: 10px;
   padding: 20px 22px;
   border-radius: 22px;
-  border: 1px solid rgba(120, 160, 255, 0.22);
+  border: 1px solid rgba(155, 92, 255, 0.24);
   background:
-    linear-gradient(135deg, rgba(79, 70, 229, 0.22) 0%, rgba(34, 211, 238, 0.12) 52%, rgba(244, 114, 182, 0.12) 100%);
+    linear-gradient(135deg, rgba(155, 92, 255, 0.24) 0%, rgba(0, 213, 255, 0.10) 48%, rgba(255, 47, 179, 0.16) 100%);
   box-shadow:
     0 18px 40px rgba(4, 10, 28, 0.35),
-    0 0 0 1px rgba(139, 92, 246, 0.10),
-    0 0 28px rgba(34, 211, 238, 0.08);
+    0 0 0 1px rgba(155, 92, 255, 0.10),
+    0 0 32px rgba(255, 47, 179, 0.08);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
-
 .best-router-label {
   font-size: 0.78rem;
   font-weight: 800;
