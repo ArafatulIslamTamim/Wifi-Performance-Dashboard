@@ -1,5 +1,6 @@
 # 📘 WiFi Mesh Performance Dashboard
 
+Live link: [https://wifi-performance-dashboard.onrender.com/](https://wifi-performance-dashboard.onrender.com/)
 
 Interactive web dashboard for comparing **WiFi mesh vs non-mesh performance** using pre-stored CSV datasets.
 
